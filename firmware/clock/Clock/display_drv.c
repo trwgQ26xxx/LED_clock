@@ -147,7 +147,7 @@ inline static void Convert_display_data_to_segments(volatile struct display_data
 	Uint8_to_two_7segments_with_blanking(data->date,		&date_buffer[0], &date_buffer[1], seg_table_date_temperature);
 	date_buffer[1] |= DATE_DP_ON;	/* Set decimal point at the date */
 
-	Uint8_to_two_7segments_with_blanking(data->month,		&date_buffer[2], &date_buffer[3], seg_table_date_temperature);
+	Uint8_to_two_7segments_without_blanking(data->month,	&date_buffer[2], &date_buffer[3], seg_table_date_temperature);
 	date_buffer[3] |= DATE_DP_ON;	/* Set decimal point at the month */
 
 	date_buffer[4] = seg_table_date_temperature[2]; date_buffer[5] = seg_table_date_temperature[0]; /* Set year prefix to 20 */
@@ -359,7 +359,6 @@ inline static void Write_CMD_to_all_displays(uint16_t cmd)
 }
 
 
-
 inline static void SPI_Flush(void)
 {
 	/* Flush buffer */
@@ -386,10 +385,8 @@ inline static void SPI_Send(uint16_t data_byte)
 
 inline static void LCD_Delay(void)
 {
-	/*for(uint32_t i = 0; i < 100; i++)
+	for(uint32_t i = 0; i < 100; i++)
 	{
 		asm volatile("nop");
-	}*/
-
-	LL_mDelay(1);
+	}
 }
