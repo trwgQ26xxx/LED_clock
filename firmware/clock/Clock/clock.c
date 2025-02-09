@@ -13,6 +13,8 @@
 #include "rtc_drv.h"
 #include "kbd_drv.h"
 
+#include "../Core/Inc/iwdg.h"
+
 enum CLOCK_MODES {NORMAL = 0, HOUR_SET, MINUTE_SET, SECOND_SET, DATE_SET, MONTH_SET, YEAR_SET, DEMO};
 
 volatile uint8_t current_clock_mode = NORMAL;
@@ -64,6 +66,9 @@ void Set_update_display_flag(void)
 
 void Init(void)
 {
+	/* Poke WDT */
+	LL_IWDG_ReloadCounter(IWDG);
+
 	/* Initialize display */
 	Init_display(current_intensity);
 
@@ -102,6 +107,9 @@ void Init(void)
 	display_data.int_temperature = 0;
 
 	display_data.special_mode = DISPLAY_INT_TEMP;
+
+	/* Poke WDT */
+	LL_IWDG_ReloadCounter(IWDG);
 }
 
 void Run(void)
@@ -158,6 +166,9 @@ void Run(void)
 		/* Perform update */
 		Update_display(&display_data);
 	}
+
+	/* Poke WDT */
+	LL_IWDG_ReloadCounter(IWDG);
 }
 
 inline static void Normal_mode(void)
