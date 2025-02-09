@@ -1,4 +1,5 @@
-/PCB/GERBERS/
+/PCB/GERBERS*
+/PCB/*cache
 /PCB/*backups/
 /firmware/.metadata/
 /firmware/clock/*.launch
