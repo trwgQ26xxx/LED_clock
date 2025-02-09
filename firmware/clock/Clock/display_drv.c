@@ -46,6 +46,7 @@
 
 #define DATE_DEG_SIGN			0x0F
 #define DATE_C_SIGN				0x99
+#define DATE_I_SIGN				0x18
 #define DATE_MINUS_SIGN			0x04
 
 /* Common for all */
@@ -274,6 +275,17 @@ inline static void Override_display_data_for_special_mode(volatile struct displa
 
 		/* Blank temperature display */
 		Blank_segments_buffer(temp_buffer);
+
+		break;
+
+	case DISPLAY_INTENSITY:
+
+		/* Blank temperature display */
+		Blank_segments_buffer(temp_buffer);
+
+		/* Show intensity */
+		temp_buffer[1] = DATE_MINUS_SIGN; temp_buffer[4] = DATE_MINUS_SIGN;
+		Uint8_to_two_7segments_with_blanking(data->intensity, &temp_buffer[2], &temp_buffer[3], seg_table_date_temperature);
 
 		break;
 

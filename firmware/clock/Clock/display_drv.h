@@ -27,6 +27,8 @@ struct display_data_struct
 
 	int8_t int_temperature;
 
+	uint8_t intensity;
+
 	uint8_t special_mode;
 };
 
@@ -35,6 +37,7 @@ enum DISPLAY_MODES
 	DISPLAY_INT_TEMP = 0, DISPLAY_EXT_TEMP,
 	DISPLAY_SET_HOUR, DISPLAY_SET_MINUTE, DISPLAY_SET_SECOND,
 	DISPLAY_SET_DATE, DISPLAY_SET_MONTH, DISPLAY_SET_YEAR,
+	DISPLAY_INTENSITY,
 	DISPLAY_DEMO
 };
 

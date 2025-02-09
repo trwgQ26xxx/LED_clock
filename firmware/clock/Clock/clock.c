@@ -16,7 +16,14 @@
 
 #include "../Core/Inc/iwdg.h"
 
-enum CLOCK_MODES {NORMAL = 0, HOUR_SET, MINUTE_SET, SECOND_SET, DATE_SET, MONTH_SET, YEAR_SET, DEMO};
+enum CLOCK_MODES
+{
+	NORMAL = 0,
+	HOUR_SET, MINUTE_SET, SECOND_SET,
+	DATE_SET, MONTH_SET, YEAR_SET,
+	INTENSITY_SET,
+	DEMO
+};
 
 volatile uint8_t current_clock_mode = NORMAL;
 
@@ -159,6 +166,10 @@ void Run(void)
 			Year_set_mode();
 			break;
 
+		case INTENSITY_SET:
+			Normal_mode();
+			break;
+
 		case DEMO:
 			Normal_mode();
 			break;
@@ -218,6 +229,10 @@ inline static void Normal_mode(void)
 		/* TODO: Switch between ext and in every 2s */
 		display_data.special_mode = DISPLAY_INT_TEMP;
 	}
+	else if(current_clock_mode == INTENSITY_SET)
+	{
+		display_data.special_mode = DISPLAY_INTENSITY;
+	}
 	else
 	{
 		display_data.special_mode = DISPLAY_DEMO;
@@ -237,7 +252,12 @@ inline static void Normal_mode(void)
 			/* Increment display intensity */
 			Inc_value(&clock_settings.intensity, MAX_INTENSITY);
 
+			/* Set intensity */
 			Set_intensity(clock_settings.intensity);
+			display_data.intensity = clock_settings.intensity;
+
+			/* Show intensity */
+			current_clock_mode = INTENSITY_SET;
 
 			//Mark to save after 2s
 			Set_flag_to_store_settings();
@@ -249,7 +269,12 @@ inline static void Normal_mode(void)
 			/* Decrement display intensity */
 			Dec_value(&clock_settings.intensity, MIN_INTENSITY);
 
+			/* Set intensity */
 			Set_intensity(clock_settings.intensity);
+			display_data.intensity = clock_settings.intensity;
+
+			/* Show intensity */
+			current_clock_mode = INTENSITY_SET;
 
 			//Mark to save it after 2s
 			Set_flag_to_store_settings();
@@ -259,7 +284,7 @@ inline static void Normal_mode(void)
 		else if(ESC_KEY_IS_PRESSED)
 		{
 			/* Toggle modes between normal and demo */
-			if(current_clock_mode == NORMAL)
+			if(current_clock_mode != DEMO)
 			{
 				current_clock_mode = DEMO;
 			}
@@ -553,6 +578,14 @@ inline static void Manage_store_settings(void)
 
 			/* Store settings */
 			Write_settings(&clock_settings);
+
+			/* Check if clock is still @ intensity, because */
+			/* It can be in different mode (setting time) */
+			if(current_clock_mode == INTENSITY_SET)
+			{
+				/* Return to normal */
+				current_clock_mode = NORMAL;
+			}
 		}
 	}
 }
