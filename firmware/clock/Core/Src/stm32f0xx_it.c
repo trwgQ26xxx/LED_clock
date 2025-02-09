@@ -142,6 +142,19 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles TIM14 global interrupt.
+  */
+void TIM14_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM14_IRQn 0 */
+	Set_update_display_flag();
+  /* USER CODE END TIM14_IRQn 0 */
+  /* USER CODE BEGIN TIM14_IRQn 1 */
+
+  /* USER CODE END TIM14_IRQn 1 */
+}
+
+/**
   * @brief This function handles TIM16 global interrupt.
   */
 void TIM16_IRQHandler(void)

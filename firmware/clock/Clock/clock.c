@@ -25,6 +25,7 @@ volatile struct display_data_struct display_data;
 volatile uint8_t keyboard_is_locked = FALSE;
 
 volatile uint8_t read_rtc_flag = FALSE;
+volatile uint8_t update_display_flag = FALSE;
 
 inline static void Normal_mode(void);
 inline static void Hour_set_mode(void);
@@ -52,6 +53,15 @@ void Set_read_RTC_flag(void)
 	NVIC_ClearPendingIRQ(TIM16_IRQn);
 }
 
+void Set_update_display_flag(void)
+{
+	update_display_flag = TRUE;
+
+	LL_TIM_ClearFlag_UPDATE(TIM14);
+
+	NVIC_ClearPendingIRQ(TIM14_IRQn);
+}
+
 void Init(void)
 {
 	/* Initialize display */
@@ -66,11 +76,17 @@ void Init(void)
 
 	/* TODO: read intensity from flash */
 
-	/* Enable timer to read RTC 4 times per second */
+	/* Enable Timer 16 to read RTC 4 times per second */
 	LL_TIM_SetCounter(TIM16, 0);
 	LL_TIM_EnableCounter(TIM16);
 	LL_TIM_ClearFlag_UPDATE(TIM16);
 	LL_TIM_EnableIT_UPDATE(TIM16);
+
+	/* Enable Timer 14 to update display 10 times per second */
+	LL_TIM_SetCounter(TIM14, 0);
+	LL_TIM_EnableCounter(TIM14);
+	LL_TIM_ClearFlag_UPDATE(TIM14);
+	LL_TIM_EnableIT_UPDATE(TIM14);
 
 	/* Clear display data structure */
 	display_data.hour = 0;
@@ -134,7 +150,14 @@ void Run(void)
 	Manage_keyboard_unlock();
 
 	/* Handle display */
-	Update_display(&display_data);
+	if(update_display_flag == TRUE)
+	{
+		/* Clear flag */
+		update_display_flag = FALSE;
+
+		/* Perform update */
+		Update_display(&display_data);
+	}
 }
 
 inline static void Normal_mode(void)

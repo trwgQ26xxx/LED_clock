@@ -10,6 +10,8 @@
 
 void Set_read_RTC_flag(void);
 
+void Set_update_display_flag(void);
+
 void Init(void);
 
 void Run(void);
