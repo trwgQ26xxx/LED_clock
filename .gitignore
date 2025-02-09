@@ -1,6 +1,7 @@
 /PCB/GERBERS/
 /PCB/*backups/
 /firmware/.metadata/
+/firmware/clock/*.launch
 /firmware/clock/.metadata/
 /firmware/clock/.settings/
 /firmware/clock/Debug/
