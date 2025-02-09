@@ -46,7 +46,7 @@ void MX_TIM14_Init(void)
   /* USER CODE END TIM14_Init 1 */
   TIM_InitStruct.Prescaler = 7999;
   TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
-  TIM_InitStruct.Autoreload = 100;
+  TIM_InitStruct.Autoreload = DISPLAY_UPDATE_PERIOD;
   TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
   LL_TIM_Init(TIM14, &TIM_InitStruct);
   LL_TIM_DisableARRPreload(TIM14);
@@ -77,7 +77,7 @@ void MX_TIM16_Init(void)
   /* USER CODE END TIM16_Init 1 */
   TIM_InitStruct.Prescaler = 7999;
   TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
-  TIM_InitStruct.Autoreload = 250;
+  TIM_InitStruct.Autoreload = RTC_READ_PERIOD;
   TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
   TIM_InitStruct.RepetitionCounter = 0;
   LL_TIM_Init(TIM16, &TIM_InitStruct);

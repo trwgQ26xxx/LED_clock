@@ -12,6 +12,7 @@
 #include "display_drv.h"
 #include "rtc_drv.h"
 #include "kbd_drv.h"
+#include "flash_drv.h"
 
 #include "../Core/Inc/iwdg.h"
 
@@ -19,12 +20,16 @@ enum CLOCK_MODES {NORMAL = 0, HOUR_SET, MINUTE_SET, SECOND_SET, DATE_SET, MONTH_
 
 volatile uint8_t current_clock_mode = NORMAL;
 
-volatile uint8_t current_intensity = (MAX_INTENSITY + MIN_INTENSITY) / 2;
-
 volatile struct rtc_data_struct rtc_data;
 volatile struct display_data_struct display_data;
+volatile struct settings_struct clock_settings;
 
 volatile uint8_t keyboard_is_locked = FALSE;
+
+#define STORE_SETTINGS_DELAY	2000	//ms
+#define STORE_SETTINGS_CNTR_MAX	(STORE_SETTINGS_DELAY / DISPLAY_UPDATE_PERIOD)
+volatile uint8_t store_settings_flag = FALSE;
+volatile uint8_t store_settings_delay_counter = 0;
 
 volatile uint8_t read_rtc_flag = FALSE;
 volatile uint8_t update_display_flag = FALSE;
@@ -37,14 +42,17 @@ inline static void Date_set_mode(void);
 inline static void Month_set_mode(void);
 inline static void Year_set_mode(void);
 
-void Lock_keyboard(void);
-void Manage_keyboard_unlock(void);
+inline static void Lock_keyboard(void);
+inline static void Manage_keyboard_unlock(void);
 
-inline void Inc_value(volatile uint8_t *val, uint8_t max);
-inline void Dec_value(volatile uint8_t *val, uint8_t min);
+inline static void Set_flag_to_store_settings(void);
+inline static void Manage_store_settings(void);
 
-inline void Inc_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max);
-inline void Dec_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max);
+inline static void Inc_value(volatile uint8_t *val, uint8_t max);
+inline static void Dec_value(volatile uint8_t *val, uint8_t min);
+
+inline static void Inc_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max);
+inline static void Dec_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max);
 
 void Set_read_RTC_flag(void)
 {
@@ -69,8 +77,14 @@ void Init(void)
 	/* Poke WDT */
 	LL_IWDG_ReloadCounter(IWDG);
 
+	/* Init flash */
+	Init_flash();
+
+	/* Read settings from flash */
+	Read_settings(&clock_settings);
+
 	/* Initialize display */
-	Init_display(current_intensity);
+	Init_display(clock_settings.intensity);
 
 	/* Initialize keyboard */
 	ENABLE_KBD_TIMER;
@@ -165,6 +179,9 @@ void Run(void)
 
 		/* Perform update */
 		Update_display(&display_data);
+
+		/* Storing settings is linked to display timer */
+		Manage_store_settings();
 	}
 
 	/* Poke WDT */
@@ -218,22 +235,24 @@ inline static void Normal_mode(void)
 		else if(PLUS_KEY_IS_PRESSED)
 		{
 			/* Increment display intensity */
-			Inc_value(&current_intensity, MAX_INTENSITY);
+			Inc_value(&clock_settings.intensity, MAX_INTENSITY);
 
-			Set_intensity(current_intensity);
+			Set_intensity(clock_settings.intensity);
 
 			//Mark to save after 2s
+			Set_flag_to_store_settings();
 
 			Lock_keyboard();
 		}
 		else if(MINUS_KEY_IS_PRESSED)
 		{
 			/* Decrement display intensity */
-			Dec_value(&current_intensity, MIN_INTENSITY);
+			Dec_value(&clock_settings.intensity, MIN_INTENSITY);
 
-			Set_intensity(current_intensity);
+			Set_intensity(clock_settings.intensity);
 
 			//Mark to save it after 2s
+			Set_flag_to_store_settings();
 
 			Lock_keyboard();
 		}
@@ -486,14 +505,14 @@ inline static void Year_set_mode(void)
 	}
 }
 
-void Lock_keyboard(void)
+inline static void Lock_keyboard(void)
 {
 	keyboard_is_locked = TRUE;
 
 	CLEAR_KBD_TIMER;
 }
 
-void Manage_keyboard_unlock(void)
+inline static void Manage_keyboard_unlock(void)
 {
 	/* Check if keyboard is locked */
 	if(keyboard_is_locked == TRUE)
@@ -516,19 +535,41 @@ void Manage_keyboard_unlock(void)
 	}
 }
 
-inline void Inc_value(volatile uint8_t *val, uint8_t max)
+inline static void Set_flag_to_store_settings(void)
+{
+	store_settings_flag = TRUE;
+	store_settings_delay_counter = 0;
+}
+
+inline static void Manage_store_settings(void)
+{
+	if(store_settings_flag == TRUE)
+	{
+		store_settings_delay_counter++;
+		if(store_settings_delay_counter >= STORE_SETTINGS_CNTR_MAX)
+		{
+			/* Clear flag */
+			store_settings_flag = FALSE;
+
+			/* Store settings */
+			Write_settings(&clock_settings);
+		}
+	}
+}
+
+inline static void Inc_value(volatile uint8_t *val, uint8_t max)
 {
 	if((*val) < max)
 		(*val)++;
 }
 
-inline void Dec_value(volatile uint8_t *val, uint8_t min)
+inline static void Dec_value(volatile uint8_t *val, uint8_t min)
 {
 	if((*val) > min)
 		(*val)--;
 }
 
-inline void Inc_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max)
+inline static void Inc_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max)
 {
 	if(*val == max)
 		*val = min;
@@ -536,7 +577,7 @@ inline void Inc_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t ma
 		(*val)++;
 }
 
-inline void Dec_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max)
+inline static void Dec_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max)
 {
 	if(*val == min)
 		*val = max;

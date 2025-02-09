@@ -127,6 +127,17 @@ SECTIONS
     PROVIDE_HIDDEN (__fini_array_end = .);
     . = ALIGN(4);
   } >FLASH
+  
+  /* Section for storing settings */
+  LAST_PAGE_SIZE = 1K;
+  LAST_PAGE_START_ADDR = ORIGIN(FLASH) + LENGTH(FLASH) - LAST_PAGE_SIZE;
+  
+  .flash_settings_block LAST_PAGE_START_ADDR (READONLY) :
+  {
+     . = ALIGN(4);
+     KEEP(*(.flash_settings_section))
+     . = ALIGN(4);
+  } >FLASH
 
   /* Used by the startup to initialize data */
   _sidata = LOADADDR(.data);

@@ -12,8 +12,6 @@
 #include "../Core/Inc/gpio.h"
 
 /* Keyboard definitions */
-#define KEYBOARD_DEBOUNCE_TIME		20	//ms
-
 #define ENTER_KEY_IS_PRESSED		(!(LL_GPIO_IsInputPinSet(ENTER_KEY_GPIO_Port, ENTER_KEY_Pin)))
 #define PLUS_KEY_IS_PRESSED			(!(LL_GPIO_IsInputPinSet(PLUS_KEY_GPIO_Port, PLUS_KEY_Pin)))
 #define MINUS_KEY_IS_PRESSED		(!(LL_GPIO_IsInputPinSet(MINUS_KEY_GPIO_Port, MINUS_KEY_Pin)))
@@ -29,7 +27,5 @@
 #define ENABLE_KBD_TIMER			LL_TIM_EnableCounter(TIM17)
 #define CLEAR_KBD_TIMER				LL_TIM_SetCounter(TIM17, 0)
 #define GET_KBD_TIMER				LL_TIM_GetCounter(TIM17)
-
-
 
 #endif /* KBD_DRV_H_ */
