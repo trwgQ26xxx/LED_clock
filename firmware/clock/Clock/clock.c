@@ -129,6 +129,8 @@ void Init(void)
 
 	display_data.special_mode = DISPLAY_INT_TEMP;
 
+	display_data.intensity = clock_settings.intensity;
+
 	/* Poke WDT */
 	LL_IWDG_ReloadCounter(IWDG);
 }
@@ -223,6 +225,9 @@ inline static void Normal_mode(void)
 		display_data.hour_colon = rtc_data.second % 2 == 1 ? FALSE : TRUE;
 	}
 
+	/* Update intensity */
+	display_data.intensity = clock_settings.intensity;
+
 	if(current_clock_mode == NORMAL)
 	{
 		/* Manage temperature display */
@@ -252,10 +257,6 @@ inline static void Normal_mode(void)
 			/* Increment display intensity */
 			Inc_value(&clock_settings.intensity, MAX_INTENSITY);
 
-			/* Set intensity */
-			Set_intensity(clock_settings.intensity);
-			display_data.intensity = clock_settings.intensity;
-
 			/* Show intensity */
 			current_clock_mode = INTENSITY_SET;
 
@@ -268,10 +269,6 @@ inline static void Normal_mode(void)
 		{
 			/* Decrement display intensity */
 			Dec_value(&clock_settings.intensity, MIN_INTENSITY);
-
-			/* Set intensity */
-			Set_intensity(clock_settings.intensity);
-			display_data.intensity = clock_settings.intensity;
 
 			/* Show intensity */
 			current_clock_mode = INTENSITY_SET;

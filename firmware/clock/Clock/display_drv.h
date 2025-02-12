@@ -10,7 +10,7 @@
 
 #include "common_definitons.h"
 
-#define MIN_INTENSITY			0x1
+#define MIN_INTENSITY			0x0
 #define MAX_INTENSITY			0xF
 
 struct display_data_struct
@@ -43,9 +43,6 @@ enum DISPLAY_MODES
 
 void Init_display(uint8_t intensity);
 
-void Set_intensity(uint8_t intensity);
-
 void Update_display(volatile struct display_data_struct *data);
-
 
 #endif /* DISPLAY_DRV_H_ */

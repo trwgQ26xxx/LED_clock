@@ -9,25 +9,28 @@
 
 #include "../Core/Inc/spi.h"
 
+/* Number of displays in the chain */
+#define NUM_OF_DISPLAYS			3
+
 /* Number of digits in each of the display */
 #define NUM_OF_DIGITS			8
 
 /* MAX7219 registers */
-#define DIGIT0_REG_ADDR			0x0100
-#define DIGIT_REG_ADDR_STEP		0x0100
-#define DIGIT1_REG_ADDR			0x0200
-#define DIGIT2_REG_ADDR			0x0300
-#define DIGIT3_REG_ADDR			0x0400
-#define DIGIT4_REG_ADDR			0x0500
-#define DIGIT5_REG_ADDR			0x0600
-#define DIGIT6_REG_ADDR			0x0700
-#define DIGIT7_REG_ADDR			0x0800
+#define DIGIT0_REG_ADDR			0x01
+#define DIGIT_REG_ADDR_STEP		0x01
+#define DIGIT1_REG_ADDR			0x02
+#define DIGIT2_REG_ADDR			0x03
+#define DIGIT3_REG_ADDR			0x04
+#define DIGIT4_REG_ADDR			0x05
+#define DIGIT5_REG_ADDR			0x06
+#define DIGIT6_REG_ADDR			0x07
+#define DIGIT7_REG_ADDR			0x08
 
-#define DECODE_MODE_REG_ADDR	0x0900
-#define INTENSITY_REG_ADDR		0x0A00
-#define SCAN_LIMIT_REG_ADDR		0x0B00
-#define SHUTDOWN_REG_ADDR		0x0C00
-#define DISPLAY_TEST_REG_ADDR	0x0F00
+#define DECODE_MODE_REG_ADDR	0x09
+#define INTENSITY_REG_ADDR		0x0A
+#define SCAN_LIMIT_REG_ADDR		0x0B
+#define SHUTDOWN_REG_ADDR		0x0C
+#define DISPLAY_TEST_REG_ADDR	0x0F
 
 /* Time display chars */
 #define TIME_COLON_ON			0x60
@@ -65,10 +68,12 @@ inline static void Blank_DP_in_segments_buffer(uint8_t *digits_data, uint8_t dp)
 inline static void Uint8_to_two_7segments_with_blanking(uint8_t val, uint8_t *first_digit, uint8_t *second_digit, const uint8_t *seg_table);
 inline static void Uint8_to_two_7segments_without_blanking(uint8_t val, uint8_t *first_digit, uint8_t *second_digit, const uint8_t *seg_table);
 
-inline static void Write_CMD_to_all_displays(uint16_t cmd);
+inline static void Clear(void);
+inline static void Set_config(uint8_t intensity);
+inline static void Write_CMD_to_all_displays(uint8_t reg, uint8_t val);
 
 inline static void SPI_Flush(void);
-inline static void SPI_Send(uint16_t data_byte);
+inline static void SPI_Send(uint8_t data);
 inline static void LCD_Delay(void);
 
 
@@ -77,24 +82,11 @@ void Init_display(uint8_t intensity)
 	/* Enable SPI */
 	LL_SPI_Enable(SPI1);
 
-	for(uint16_t i = 0; i < NUM_OF_DIGITS; i++)
-	{
-		Write_CMD_to_all_displays(((i+1) << 8) | BLANK_DISP);
-	}
+	/* Clear displays */
+	Clear();
 
-	Write_CMD_to_all_displays(SHUTDOWN_REG_ADDR | 0x01);
-
-	Write_CMD_to_all_displays(SCAN_LIMIT_REG_ADDR | 0x07);
-
-	Write_CMD_to_all_displays(DISPLAY_TEST_REG_ADDR | 0x00);
-	Write_CMD_to_all_displays(DECODE_MODE_REG_ADDR | 0x00);
-
-	Write_CMD_to_all_displays(INTENSITY_REG_ADDR | (intensity & 0x0F));
-}
-
-void Set_intensity(uint8_t intensity)
-{
-	Write_CMD_to_all_displays(INTENSITY_REG_ADDR | (intensity & 0x0F));
+	/* Set configuration */
+	Set_config(intensity);
 }
 
 void Update_display(volatile struct display_data_struct *data)
@@ -109,15 +101,18 @@ void Update_display(volatile struct display_data_struct *data)
 	/* Update display for special mode */
 	Override_display_data_for_special_mode(data, hour_digits_data, date_digits_data, temp_digits_data);
 
+	/* Update displays configuration */
+	Set_config(data->intensity);
+
 	/* Update display */
-	for(uint16_t i = 0; i < NUM_OF_DIGITS; i++)
+	for(uint8_t i = 0; i < NUM_OF_DIGITS; i++)
 	{
 		LL_GPIO_ResetOutputPin(LED_CS_GPIO_Port, LED_CS_Pin);
 		LCD_Delay();
 
-		SPI_Send(((i+1) << 8) | temp_digits_data[i]);		// Temperature display
-		SPI_Send(((i+1) << 8) | date_digits_data[i]);		// Date display
-		SPI_Send(((i+1) << 8) | hour_digits_data[i]);		// Hour display
+		SPI_Send(i+1); SPI_Send(temp_digits_data[i]);		// Temperature display, last in chain
+		SPI_Send(i+1); SPI_Send(date_digits_data[i]);		// Date display
+		SPI_Send(i+1); SPI_Send(hour_digits_data[i]);		// Hour display, first in chain
 
 		LCD_Delay();
 		LL_GPIO_SetOutputPin(LED_CS_GPIO_Port, LED_CS_Pin);
@@ -285,7 +280,7 @@ inline static void Override_display_data_for_special_mode(volatile struct displa
 
 		/* Show intensity */
 		temp_buffer[1] = DATE_MINUS_SIGN; temp_buffer[4] = DATE_MINUS_SIGN;
-		Uint8_to_two_7segments_with_blanking(data->intensity, &temp_buffer[2], &temp_buffer[3], seg_table_date_temperature);
+		Uint8_to_two_7segments_with_blanking(data->intensity + 1, &temp_buffer[2], &temp_buffer[3], seg_table_date_temperature);
 
 		break;
 
@@ -355,14 +350,34 @@ inline static void Uint8_to_two_7segments_without_blanking(uint8_t val, uint8_t 
 	*second_digit	= seg_table[val % 10];
 }
 
-inline static void Write_CMD_to_all_displays(uint16_t cmd)
+inline static void Clear(void)
+{
+	for(uint8_t i = 0; i < NUM_OF_DIGITS; i++)
+	{
+		Write_CMD_to_all_displays(i+1,  BLANK_DISP);
+	}
+}
+
+inline static void Set_config(uint8_t intensity)
+{
+	Write_CMD_to_all_displays(SHUTDOWN_REG_ADDR, 0x01);
+
+	Write_CMD_to_all_displays(SCAN_LIMIT_REG_ADDR, 0x07);
+
+	Write_CMD_to_all_displays(DISPLAY_TEST_REG_ADDR, 0x00);
+	Write_CMD_to_all_displays(DECODE_MODE_REG_ADDR, 0x00);
+
+	Write_CMD_to_all_displays(INTENSITY_REG_ADDR, (intensity & 0x0F));
+}
+
+inline static void Write_CMD_to_all_displays(uint8_t reg, uint8_t val)
 {
 	LL_GPIO_ResetOutputPin(LED_CS_GPIO_Port, LED_CS_Pin);
 	LCD_Delay();
 
-	for(uint32_t i = 0; i < 3; i++)
+	for(uint8_t i = 0; i < NUM_OF_DISPLAYS; i++)
 	{
-		SPI_Send(cmd);
+		SPI_Send(reg); SPI_Send(val);
 	}
 
 	LCD_Delay();
@@ -376,17 +391,17 @@ inline static void SPI_Flush(void)
 	/* Flush buffer */
 	while(LL_SPI_IsActiveFlag_RXNE(SPI1))
 	{
-		LL_SPI_ReceiveData16(SPI1);
+		LL_SPI_ReceiveData8(SPI1);
 	}
 }
 
-inline static void SPI_Send(uint16_t data_byte)
+inline static void SPI_Send(uint8_t data)
 {
 	/* Wait for not empty */
 	while(!LL_SPI_IsActiveFlag_TXE(SPI1));
 
 	/* Send byte */
-	LL_SPI_TransmitData16(SPI1, data_byte);
+	LL_SPI_TransmitData8(SPI1, data);
 
 	/* Wait while busy */
 	while(LL_SPI_IsActiveFlag_BSY(SPI1));
@@ -397,7 +412,7 @@ inline static void SPI_Send(uint16_t data_byte)
 
 inline static void LCD_Delay(void)
 {
-	for(uint32_t i = 0; i < 100; i++)
+	for(uint8_t i = 0; i < 150; i++)
 	{
 		asm volatile("nop");
 	}
