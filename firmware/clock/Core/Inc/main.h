@@ -75,9 +75,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define DISPLAY_UPDATE_PERIOD 125
-#define RTC_READ_PERIOD 250
 #define KEYBOARD_DEBOUNCE_TIME 20
+#define UPDATE_FREQUENCY 32
 #define ESC_KEY_Pin LL_GPIO_PIN_0
 #define ESC_KEY_GPIO_Port GPIOA
 #define MINUS_KEY_Pin LL_GPIO_PIN_1

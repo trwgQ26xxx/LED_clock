@@ -43,6 +43,8 @@ enum DISPLAY_MODES
 
 void Init_display(uint8_t intensity);
 
-void Update_display(volatile struct display_data_struct *data);
+void Update_display_config(volatile struct display_data_struct *data);
+
+void Update_display_data(volatile struct display_data_struct *data);
 
 #endif /* DISPLAY_DRV_H_ */

@@ -44,47 +44,15 @@ void MX_TIM14_Init(void)
   /* USER CODE BEGIN TIM14_Init 1 */
 
   /* USER CODE END TIM14_Init 1 */
-  TIM_InitStruct.Prescaler = 15999;
+  TIM_InitStruct.Prescaler = 159;
   TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
-  TIM_InitStruct.Autoreload = DISPLAY_UPDATE_PERIOD;
+  TIM_InitStruct.Autoreload = 3125;
   TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
   LL_TIM_Init(TIM14, &TIM_InitStruct);
   LL_TIM_DisableARRPreload(TIM14);
   /* USER CODE BEGIN TIM14_Init 2 */
 
   /* USER CODE END TIM14_Init 2 */
-
-}
-/* TIM16 init function */
-void MX_TIM16_Init(void)
-{
-
-  /* USER CODE BEGIN TIM16_Init 0 */
-
-  /* USER CODE END TIM16_Init 0 */
-
-  LL_TIM_InitTypeDef TIM_InitStruct = {0};
-
-  /* Peripheral clock enable */
-  LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_TIM16);
-
-  /* TIM16 interrupt Init */
-  NVIC_SetPriority(TIM16_IRQn, 0);
-  NVIC_EnableIRQ(TIM16_IRQn);
-
-  /* USER CODE BEGIN TIM16_Init 1 */
-
-  /* USER CODE END TIM16_Init 1 */
-  TIM_InitStruct.Prescaler = 15999;
-  TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
-  TIM_InitStruct.Autoreload = RTC_READ_PERIOD;
-  TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
-  TIM_InitStruct.RepetitionCounter = 0;
-  LL_TIM_Init(TIM16, &TIM_InitStruct);
-  LL_TIM_DisableARRPreload(TIM16);
-  /* USER CODE BEGIN TIM16_Init 2 */
-
-  /* USER CODE END TIM16_Init 2 */
 
 }
 /* TIM17 init function */

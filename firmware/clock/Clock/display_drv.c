@@ -89,7 +89,13 @@ void Init_display(uint8_t intensity)
 	Set_config(intensity);
 }
 
-void Update_display(volatile struct display_data_struct *data)
+void Update_display_config(volatile struct display_data_struct *data)
+{
+	/* Update displays configuration */
+	Set_config(data->intensity);
+}
+
+void Update_display_data(volatile struct display_data_struct *data)
 {
 	uint8_t hour_digits_data[NUM_OF_DIGITS];
 	uint8_t date_digits_data[NUM_OF_DIGITS];
@@ -100,9 +106,6 @@ void Update_display(volatile struct display_data_struct *data)
 
 	/* Update display for special mode */
 	Override_display_data_for_special_mode(data, hour_digits_data, date_digits_data, temp_digits_data);
-
-	/* Update displays configuration */
-	Set_config(data->intensity);
 
 	/* Update display */
 	for(uint8_t i = 0; i < NUM_OF_DIGITS; i++)

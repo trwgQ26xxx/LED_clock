@@ -33,13 +33,15 @@ volatile struct settings_struct clock_settings;
 
 volatile uint8_t keyboard_is_locked = FALSE;
 
-#define STORE_SETTINGS_DELAY	2000	//ms
-#define STORE_SETTINGS_CNTR_MAX	(STORE_SETTINGS_DELAY / DISPLAY_UPDATE_PERIOD)
 volatile uint8_t store_settings_flag = FALSE;
 volatile uint8_t store_settings_delay_counter = 0;
 
-volatile uint8_t read_rtc_flag = FALSE;
-volatile uint8_t update_display_flag = FALSE;
+volatile uint8_t halt_rtc_read = FALSE;
+
+volatile uint8_t update_flag = FALSE;
+volatile uint8_t update_counter = 0;
+
+inline static void Manage_periodic_updates(void);
 
 inline static void Normal_mode(void);
 inline static void Hour_set_mode(void);
@@ -61,18 +63,9 @@ inline static void Dec_value(volatile uint8_t *val, uint8_t min);
 inline static void Inc_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max);
 inline static void Dec_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max);
 
-void Set_read_RTC_flag(void)
-{
-	read_rtc_flag = TRUE;
-
-	LL_TIM_ClearFlag_UPDATE(TIM16);
-
-	NVIC_ClearPendingIRQ(TIM16_IRQn);
-}
-
 void Set_update_display_flag(void)
 {
-	update_display_flag = TRUE;
+	update_flag = TRUE;
 
 	LL_TIM_ClearFlag_UPDATE(TIM14);
 
@@ -100,15 +93,7 @@ void Init(void)
 	/* Initialize RTC */
 	Init_RTC();
 
-	/* TODO: read intensity from flash */
-
-	/* Enable Timer 16 to read RTC 4 times per second */
-	LL_TIM_SetCounter(TIM16, 0);
-	LL_TIM_EnableCounter(TIM16);
-	LL_TIM_ClearFlag_UPDATE(TIM16);
-	LL_TIM_EnableIT_UPDATE(TIM16);
-
-	/* Enable Timer 14 to update display 10 times per second */
+	/* Enable Timer 14 to perform periodic updates 32 times per second */
 	LL_TIM_SetCounter(TIM14, 0);
 	LL_TIM_EnableCounter(TIM14);
 	LL_TIM_ClearFlag_UPDATE(TIM14);
@@ -137,6 +122,9 @@ void Init(void)
 
 void Run(void)
 {
+	/* Manage RTC, LED display updates */
+	Manage_periodic_updates();
+
 	/* Handle current mode */
 	switch(current_clock_mode)
 	{
@@ -184,46 +172,73 @@ void Run(void)
 	/* Handle keyboard */
 	Manage_keyboard_unlock();
 
-	/* Handle display */
-	if(update_display_flag == TRUE)
-	{
-		/* Clear flag */
-		update_display_flag = FALSE;
-
-		/* Perform update */
-		Update_display(&display_data);
-
-		/* Storing settings is linked to display timer */
-		Manage_store_settings();
-	}
-
 	/* Poke WDT */
 	LL_IWDG_ReloadCounter(IWDG);
 }
 
+inline static void Manage_periodic_updates(void)
+{
+	/* Check update flag */
+	if(update_flag == TRUE)
+	{
+		/* Check RTC read match */
+		if((update_counter % RTC_READ_MODULO) == RTC_READ_OFFSET)
+		{
+			/* Match. Check if RTC read is not halted */
+			if(halt_rtc_read == FALSE)
+			{
+				/* Not halted */
+
+				/* Get data from RTC */
+				Get_RTC_data(&rtc_data);
+
+				/* Copy data from RTC */
+				display_data.second				= rtc_data.second;
+				display_data.minute				= rtc_data.minute;
+				display_data.hour				= rtc_data.hour;
+				display_data.date				= rtc_data.date;
+				display_data.month				= rtc_data.month;
+				display_data.year				= rtc_data.year;
+				display_data.int_temperature	= rtc_data.temperature;
+
+				/* Manage colon */
+				display_data.hour_colon = rtc_data.second % 2 == 1 ? FALSE : TRUE;
+			}
+		}
+
+		/* Check LED data update match */
+		if((update_counter % LED_DATA_UPDATE_MODULO) == LED_DATA_UPDATE_OFFSET)
+		{
+			/* Perform LED data update */
+			Update_display_data(&display_data);
+		}
+
+		/* Check LED configuration update match */
+		if((update_counter % LED_CFG_UPDATE_MODULO) == LED_CFG_UPDATE_OFFSET)
+		{
+			/* Perform LED data update */
+			Update_display_config(&display_data);
+		}
+
+		/* Storing settings is linked to update timer too */
+		Manage_store_settings();
+
+		/* Clear flag */
+		update_flag = FALSE;
+
+		/* Advance update counter */
+		update_counter++;
+		if(update_counter >= UPDATE_FREQUENCY)
+		{
+ 			update_counter = 0;
+		}
+	}
+}
+
 inline static void Normal_mode(void)
 {
-	/* Is RTC flag set ? */
-	if(read_rtc_flag == TRUE)
-	{
-		/* Clear flag */
-		read_rtc_flag = FALSE;
-
-		/* Get data from RTC */
-		Get_RTC_data(&rtc_data);
-
-		/* Copy data from RTC */
-		display_data.second				= rtc_data.second;
-		display_data.minute				= rtc_data.minute;
-		display_data.hour				= rtc_data.hour;
-		display_data.date				= rtc_data.date;
-		display_data.month				= rtc_data.month;
-		display_data.year				= rtc_data.year;
-		display_data.int_temperature	= rtc_data.temperature;
-
-		/* Manage colon */
-		display_data.hour_colon = rtc_data.second % 2 == 1 ? FALSE : TRUE;
-	}
+	/* Read RTC */
+	halt_rtc_read = FALSE;
 
 	/* Update intensity */
 	display_data.intensity = clock_settings.intensity;
@@ -297,6 +312,9 @@ inline static void Normal_mode(void)
 
 inline static void Hour_set_mode(void)
 {
+	/* Halt RTC */
+	halt_rtc_read = TRUE;
+
 	/* Display hour set mode */
 	display_data.special_mode = DISPLAY_SET_HOUR;
 
@@ -335,6 +353,9 @@ inline static void Hour_set_mode(void)
 
 inline static void Minute_set_mode(void)
 {
+	/* Halt RTC */
+	halt_rtc_read = TRUE;
+
 	/* Display minute set mode */
 	display_data.special_mode = DISPLAY_SET_MINUTE;
 
@@ -373,6 +394,9 @@ inline static void Minute_set_mode(void)
 
 inline static void Second_set_mode(void)
 {
+	/* Halt RTC */
+	halt_rtc_read = TRUE;
+
 	/* Display second set mode */
 	display_data.special_mode = DISPLAY_SET_SECOND;
 
@@ -404,6 +428,9 @@ inline static void Second_set_mode(void)
 
 inline static void Date_set_mode(void)
 {
+	/* Halt RTC */
+	halt_rtc_read = TRUE;
+
 	/* Display date set mode */
 	display_data.special_mode = DISPLAY_SET_DATE;
 
@@ -442,6 +469,9 @@ inline static void Date_set_mode(void)
 
 inline static void Month_set_mode(void)
 {
+	/* Halt RTC */
+	halt_rtc_read = TRUE;
+
 	/* Display month set mode */
 	display_data.special_mode = DISPLAY_SET_MONTH;
 
@@ -480,6 +510,9 @@ inline static void Month_set_mode(void)
 
 inline static void Year_set_mode(void)
 {
+	/* Halt RTC */
+	halt_rtc_read = TRUE;
+
 	/* Display year set mode */
 	display_data.special_mode = DISPLAY_SET_YEAR;
 
