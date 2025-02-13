@@ -31,15 +31,17 @@ volatile struct rtc_data_struct rtc_data;
 volatile struct display_data_struct display_data;
 volatile struct settings_struct clock_settings;
 
-volatile uint8_t keyboard_is_locked = FALSE;
+volatile uint8_t	keyboard_is_locked = FALSE;
 
-volatile uint8_t store_settings_flag = FALSE;
-volatile uint8_t store_settings_delay_counter = 0;
+volatile uint8_t	store_settings_flag = FALSE;
+volatile uint32_t	store_settings_delay_counter = 0;
 
-volatile uint8_t halt_rtc_read = FALSE;
+volatile uint32_t	clock_set_inactivity_counter = 0;
 
-volatile uint8_t update_flag = FALSE;
-volatile uint8_t update_counter = 0;
+volatile uint8_t	halt_rtc_read = FALSE;
+
+volatile uint8_t	update_flag = FALSE;
+volatile uint32_t	update_counter = 0;
 
 inline static void Manage_periodic_updates(void);
 
@@ -56,6 +58,9 @@ inline static void Manage_keyboard_unlock(void);
 
 inline static void Set_flag_to_store_settings(void);
 inline static void Manage_store_settings(void);
+
+inline static void Clear_clock_set_inactivity_counter(void);
+inline static void Manage_clock_set_inactivity(void);
 
 inline static void Inc_value(volatile uint8_t *val, uint8_t max);
 inline static void Dec_value(volatile uint8_t *val, uint8_t min);
@@ -220,8 +225,11 @@ inline static void Manage_periodic_updates(void)
 			Update_display_config(&display_data);
 		}
 
-		/* Storing settings is linked to update timer too */
+		/* Store settings if necessary */
 		Manage_store_settings();
+
+		/* Exit clock set mode if no changes were made for 10s */
+		Manage_clock_set_inactivity();
 
 		/* Clear flag */
 		update_flag = FALSE;
@@ -263,7 +271,14 @@ inline static void Normal_mode(void)
 	{
 		if(ENTER_KEY_IS_PRESSED)
 		{
+			/* Halt RTC */
+			halt_rtc_read = TRUE;
+
+			/* Go to first position set mode */
 			current_clock_mode = HOUR_SET;
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -324,7 +339,11 @@ inline static void Hour_set_mode(void)
 		/* Handle keys */
 		if(ENTER_KEY_IS_PRESSED)
 		{
+			/* Go to next setting */
 			current_clock_mode = MINUTE_SET;
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -333,12 +352,18 @@ inline static void Hour_set_mode(void)
 			/* Increment hour */
 			Inc_value_with_rewind(&display_data.hour, 0, 23);
 
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
+
 			Lock_keyboard();
 		}
 		else if(MINUS_KEY_IS_PRESSED)
 		{
 			/* Decrement hour */
 			Dec_value_with_rewind(&display_data.hour, 0, 23);
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -365,7 +390,11 @@ inline static void Minute_set_mode(void)
 		/* Handle keys */
 		if(ENTER_KEY_IS_PRESSED)
 		{
+			/* Go to next setting */
 			current_clock_mode = SECOND_SET;
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -374,12 +403,18 @@ inline static void Minute_set_mode(void)
 			/* Increment minute */
 			Inc_value_with_rewind(&display_data.minute, 0, 59);
 
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
+
 			Lock_keyboard();
 		}
 		else if(MINUS_KEY_IS_PRESSED)
 		{
 			/* Decrement minute */
 			Dec_value_with_rewind(&display_data.minute, 0, 59);
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -406,7 +441,11 @@ inline static void Second_set_mode(void)
 		/* Handle keys */
 		if(ENTER_KEY_IS_PRESSED)
 		{
+			/* Go to next setting */
 			current_clock_mode = DATE_SET;
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -414,6 +453,9 @@ inline static void Second_set_mode(void)
 		{
 			/* Set seconds to 0 */
 			display_data.second = 0;
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -440,7 +482,11 @@ inline static void Date_set_mode(void)
 		/* Handle keys */
 		if(ENTER_KEY_IS_PRESSED)
 		{
+			/* Go to next setting */
 			current_clock_mode = MONTH_SET;
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -449,12 +495,18 @@ inline static void Date_set_mode(void)
 			/* Increment minute */
 			Inc_value_with_rewind(&display_data.date, 1, 31);
 
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
+
 			Lock_keyboard();
 		}
 		else if(MINUS_KEY_IS_PRESSED)
 		{
 			/* Decrement minute */
 			Dec_value_with_rewind(&display_data.date, 1, 31);
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -481,7 +533,11 @@ inline static void Month_set_mode(void)
 		/* Handle keys */
 		if(ENTER_KEY_IS_PRESSED)
 		{
+			/* Go to next setting */
 			current_clock_mode = YEAR_SET;
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -490,12 +546,18 @@ inline static void Month_set_mode(void)
 			/* Increment minute */
 			Inc_value_with_rewind(&display_data.month, 1, 12);
 
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
+
 			Lock_keyboard();
 		}
 		else if(MINUS_KEY_IS_PRESSED)
 		{
 			/* Decrement minute */
 			Dec_value_with_rewind(&display_data.month, 1, 12);
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -542,12 +604,18 @@ inline static void Year_set_mode(void)
 			/* Increment minute */
 			Inc_value_with_rewind(&display_data.year, 0, 99);
 
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
+
 			Lock_keyboard();
 		}
 		else if(MINUS_KEY_IS_PRESSED)
 		{
 			/* Decrement minute */
 			Dec_value_with_rewind(&display_data.year, 0, 99);
+
+			/* Clear inactivity counter */
+			Clear_clock_set_inactivity_counter();
 
 			Lock_keyboard();
 		}
@@ -616,6 +684,26 @@ inline static void Manage_store_settings(void)
 				/* Return to normal */
 				current_clock_mode = NORMAL;
 			}
+		}
+	}
+}
+
+inline static void Clear_clock_set_inactivity_counter(void)
+{
+	clock_set_inactivity_counter = 0;
+}
+
+inline static void Manage_clock_set_inactivity(void)
+{
+	/* Check if RTC read is halted */
+	/* RTC read is halted when clock is being set */
+	if(halt_rtc_read == TRUE)
+	{
+		clock_set_inactivity_counter++;
+		if(clock_set_inactivity_counter >= CLOCK_SET_INACTIVITY_CNTR_MAX)
+		{
+			/* Go back in NORMAL mode */
+			current_clock_mode = NORMAL;
 		}
 	}
 }
