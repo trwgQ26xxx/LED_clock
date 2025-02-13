@@ -7,6 +7,8 @@
 
 #include "rtc_drv.h"
 
+#include "common_fcns.h"
+
 #include "../Core/Inc/i2c.h"
 
 #define DS3231_WRITE_ADDR		0xD0

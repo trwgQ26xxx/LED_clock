@@ -8,7 +8,7 @@
 #ifndef FLASH_DRV_H_
 #define FLASH_DRV_H_
 
-#include "common_definitons.h"
+#include "common_defs.h"
 
 struct settings_struct
 {

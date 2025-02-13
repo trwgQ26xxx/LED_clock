@@ -8,7 +8,7 @@
 #ifndef RTC_DRV_H_
 #define RTC_DRV_H_
 
-#include "common_definitons.h"
+#include <stdint.h>
 
 struct rtc_data_struct
 {

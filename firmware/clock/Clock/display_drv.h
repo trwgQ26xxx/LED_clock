@@ -8,7 +8,7 @@
 #ifndef DISPLAY_DRV_H_
 #define DISPLAY_DRV_H_
 
-#include "common_definitons.h"
+#include "common_defs.h"
 
 #define MIN_INTENSITY			0x0
 #define MAX_INTENSITY			0xF

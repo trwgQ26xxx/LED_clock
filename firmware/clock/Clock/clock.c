@@ -7,7 +7,8 @@
 
 #include "clock.h"
 
-#include "common_definitons.h"
+#include "common_defs.h"
+#include "common_fcns.h"
 
 #include "display_drv.h"
 #include "rtc_drv.h"
@@ -61,12 +62,6 @@ inline static void Manage_store_settings(void);
 
 inline static void Clear_clock_set_inactivity_counter(void);
 inline static void Manage_clock_set_inactivity(void);
-
-inline static void Inc_value(volatile uint8_t *val, uint8_t max);
-inline static void Dec_value(volatile uint8_t *val, uint8_t min);
-
-inline static void Inc_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max);
-inline static void Dec_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max);
 
 void Set_update_display_flag(void)
 {
@@ -706,32 +701,4 @@ inline static void Manage_clock_set_inactivity(void)
 			current_clock_mode = NORMAL;
 		}
 	}
-}
-
-inline static void Inc_value(volatile uint8_t *val, uint8_t max)
-{
-	if((*val) < max)
-		(*val)++;
-}
-
-inline static void Dec_value(volatile uint8_t *val, uint8_t min)
-{
-	if((*val) > min)
-		(*val)--;
-}
-
-inline static void Inc_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max)
-{
-	if(*val == max)
-		*val = min;
-	else
-		(*val)++;
-}
-
-inline static void Dec_value_with_rewind(volatile uint8_t *val, uint8_t min, uint8_t max)
-{
-	if(*val == min)
-		*val = max;
-	else
-		(*val)--;
 }
