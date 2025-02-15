@@ -19535,7 +19535,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "2k2"
 			(at 0 -1.82 0)
 			(layer "B.Fab")
 			(uuid "1d6c7562-42ff-4795-97a9-cbb9703026e2")
@@ -19925,7 +19925,7 @@
 		)
 		(fp_arc
 			(start 21.59 0.25)
-			(mid 21.329578 0.950494)
+			(mid 21.329583 0.950487)
 			(end 20.68 1.32)
 			(stroke
 				(width 0.05)
@@ -19947,7 +19947,7 @@
 		)
 		(fp_arc
 			(start 20.68 -1.32)
-			(mid 21.329593 -0.950487)
+			(mid 21.329556 -0.950479)
 			(end 21.59 -0.25)
 			(stroke
 				(width 0.05)
@@ -25848,7 +25848,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "2k2"
 			(at 2.375 -1.82 0)
 			(layer "B.Fab")
 			(uuid "c1934355-84d3-46e4-b7c4-c97f44bb4fc5")
@@ -27374,7 +27374,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "2k2"
 			(at 0 -1.82 0)
 			(layer "B.Fab")
 			(uuid "4cbf587b-1a50-4550-a190-af2880216b89")
