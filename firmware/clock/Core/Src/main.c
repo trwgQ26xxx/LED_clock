@@ -99,8 +99,8 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM17_Init();
   MX_TIM14_Init();
-  MX_IWDG_Init();
   MX_CRC_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   Init();
   /* USER CODE END 2 */
