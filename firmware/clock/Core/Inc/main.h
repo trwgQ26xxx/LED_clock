@@ -28,6 +28,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 
+#include "stm32f0xx_ll_crc.h"
 #include "stm32f0xx_ll_i2c.h"
 #include "stm32f0xx_ll_iwdg.h"
 #include "stm32f0xx_ll_crs.h"

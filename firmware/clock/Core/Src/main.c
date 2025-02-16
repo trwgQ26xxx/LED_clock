@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "crc.h"
 #include "i2c.h"
 #include "iwdg.h"
 #include "spi.h"
@@ -99,6 +100,7 @@ int main(void)
   MX_TIM17_Init();
   MX_TIM14_Init();
   MX_IWDG_Init();
+  MX_CRC_Init();
   /* USER CODE BEGIN 2 */
   Init();
   /* USER CODE END 2 */
