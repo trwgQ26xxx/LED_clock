@@ -18,9 +18,9 @@ volatile struct settings_struct flash_settings __attribute__((__section__(".flas
 
 #define FLASH_SETTINGS_ID		0x7EC9
 
-#define FLASH_UNLOCK_TIMEOUT	20
-#define FLASH_ERASE_TIMEOUT		200
-#define FLASH_PROGRAM_TIMEOUT	20
+#define FLASH_UNLOCK_TIMEOUT	2
+#define FLASH_ERASE_TIMEOUT		50	/* Typical page erase time is 30ms */
+#define FLASH_PROGRAM_TIMEOUT	50	/* Typical program time (single uint16_t) is 53.5us */
 
 #define FLASH_UNLOCK_KEY1		0x45670123
 #define FLASH_UNLOCK_KEY2		0xCDEF89AB
@@ -127,18 +127,17 @@ void Flash_program(volatile struct settings_struct *s)
 	volatile uint16_t *dst_addr = (uint16_t *)(&flash_settings);
 
 	uint8_t programmed_OK = TRUE;
+	uint32_t timeout = 0;
 
 	/* Set the PG bit in the FLASH_CR register to enable programming */
 	FLASH->CR |= FLASH_CR_PG;
+
+	CLEAR_TICK;
 
 	for(volatile uint32_t i = 0; i < (sizeof(flash_settings) / sizeof(uint16_t)); i++)
 	{
 		/* Perform the data write (half-word) at the desired address */
 		*dst_addr = *src_addr;
-
-		uint32_t timeout = 0;
-
-		CLEAR_TICK;
 
 		/* Wait until the BSY bit is reset in the FLASH_SR register */
 		while((FLASH->SR & FLASH_SR_BSY) != 0)
