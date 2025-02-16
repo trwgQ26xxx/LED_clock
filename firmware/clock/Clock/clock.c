@@ -77,9 +77,6 @@ void Init(void)
 	/* Poke WDT */
 	LL_IWDG_ReloadCounter(IWDG);
 
-	/* Init flash */
-	Init_flash();
-
 	/* Read settings from flash */
 	Read_settings(&clock_settings);
 

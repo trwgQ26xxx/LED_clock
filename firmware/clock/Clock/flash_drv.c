@@ -7,36 +7,118 @@
 
 #include "flash_drv.h"
 
+#include "common_fcns.h"
 #include "display_drv.h"
+#include "crc.h"
 
 #include <string.h>
 #include "../Drivers/CMSIS/Device/ST/STM32F0xx/Include/stm32f0xx.h"
 
 volatile struct settings_struct flash_settings __attribute__((__section__(".flash_settings_section")));
 
-#define FLASH_FKEY1 0x45670123
-#define FLASH_FKEY2 0xCDEF89AB
+#define FLASH_SETTINGS_ID		0x7EC9
 
-void Flash_unlock(void)
+#define FLASH_UNLOCK_TIMEOUT	20
+#define FLASH_ERASE_TIMEOUT		200
+#define FLASH_PROGRAM_TIMEOUT	20
+
+#define FLASH_UNLOCK_KEY1		0x45670123
+#define FLASH_UNLOCK_KEY2		0xCDEF89AB
+
+uint8_t Verify_settings(struct settings_struct *s);
+void Restore_settings_to_default(struct settings_struct *s);
+
+void Flash_read(volatile struct settings_struct *s);
+void Flash_program(volatile struct settings_struct *s);
+uint8_t Page_erase(void);
+
+uint8_t Flash_unlock(void);
+void Flash_lock(void);
+
+void Read_settings(volatile struct settings_struct *s)
 {
-	/* (1) Wait till no operation is on going */
-	/* (2) Check that the flash memory is unlocked */
-	/* (3) Perform unlock sequence */
-	while ((FLASH->SR & FLASH_SR_BSY) != 0) /* (1) */
+	struct settings_struct temp_settings;
+
+	/* Check size */
+	static_assert((sizeof(flash_settings) % sizeof(uint16_t)) == 0,
+			"Flash settings structure has to be a multiple of uint16_t!");
+
+	/* Read settings from flash */
+	Flash_read(&temp_settings);
+
+	/* Check settings */
+	if(Verify_settings(&temp_settings) == FALSE)
 	{
-		/* For robust implementation, add here time-out management */
+		/* Verification failed, restore to default values */
+		Restore_settings_to_default(&temp_settings);
+
+		/* Store settings */
+		Write_settings(&temp_settings);
 	}
 
-	if ((FLASH->CR & FLASH_CR_LOCK) != 0) /* (2) */
-	{
-		FLASH->KEYR = FLASH_FKEY1; /* (3) */
-		FLASH->KEYR = FLASH_FKEY2;
-	}
+	/* Copy settings */
+	memcpy((void *)s, (void *)&temp_settings, sizeof(struct settings_struct));
 }
 
-void Flash_lock(void)
+void Write_settings(volatile struct settings_struct *s)
 {
-	FLASH->CR |= FLASH_CR_LOCK;
+	/* Write ID */
+	s->ID = FLASH_SETTINGS_ID;
+
+	/* Clear unused field */
+	s->unused = 0;
+
+	/* Update CRC */
+	s->crc = Calculate_CRC32((uint8_t *)s, sizeof(struct settings_struct) - sizeof(uint32_t));
+
+	if(Flash_unlock() == TRUE)
+	{
+		if(Page_erase() == TRUE)
+		{
+			(void)Flash_program(s);
+		}
+	}
+
+	Flash_lock();
+}
+
+uint8_t Verify_settings(struct settings_struct *s)
+{
+	uint8_t settings_OK = FALSE;
+
+	/* Check ID */
+	if(s->ID == FLASH_SETTINGS_ID)
+	{
+		/* ID OK */
+
+		/* Check CRC */
+		if(s->crc == Calculate_CRC32((uint8_t *)s, sizeof(struct settings_struct) - sizeof(uint32_t)))
+		{
+			/* CRC OK */
+
+			/* Check data validity */
+
+			/* Check intensity setting */
+			if((s->intensity < MAX_INTENSITY) && (s->intensity > MIN_INTENSITY))
+			{
+				/* Settings OK */
+				settings_OK = TRUE;
+			}
+		}
+	}
+
+	return settings_OK;
+}
+
+void Restore_settings_to_default(struct settings_struct *s)
+{
+	/* Assign default value */
+	s->intensity = (MAX_INTENSITY + MIN_INTENSITY) / 2;
+}
+
+void Flash_read(volatile struct settings_struct *s)
+{
+	memcpy((void *)s, (void *)&flash_settings, sizeof(struct settings_struct));
 }
 
 void Flash_program(volatile struct settings_struct *s)
@@ -44,106 +126,147 @@ void Flash_program(volatile struct settings_struct *s)
 	volatile uint16_t *src_addr = (uint16_t *)s;
 	volatile uint16_t *dst_addr = (uint16_t *)(&flash_settings);
 
-	/* (1) Set the PG bit in the FLASH_CR register to enable programming */
-	/* (2) Perform the data write (half-word) at the desired address */
-	/* (3) Wait until the BSY bit is reset in the FLASH_SR register */
-	/* (4) Check the EOP flag in the FLASH_SR register */
-	/* (5) clear it by software by writing it at 1 */
-	/* (6) Reset the PG Bit to disable programming */
-	FLASH->CR |= FLASH_CR_PG; /* (1) */
+	uint8_t programmed_OK = TRUE;
+
+	/* Set the PG bit in the FLASH_CR register to enable programming */
+	FLASH->CR |= FLASH_CR_PG;
 
 	for(volatile uint32_t i = 0; i < (sizeof(flash_settings) / sizeof(uint16_t)); i++)
 	{
-		*dst_addr = *src_addr;/* (2) */
+		/* Perform the data write (half-word) at the desired address */
+		*dst_addr = *src_addr;
 
-		while ((FLASH->SR & FLASH_SR_BSY) != 0) /* (3) */
+		uint32_t timeout = 0;
+
+		CLEAR_TICK;
+
+		/* Wait until the BSY bit is reset in the FLASH_SR register */
+		while((FLASH->SR & FLASH_SR_BSY) != 0)
 		{
-		/* For robust implementation, add here time-out management */
+			if(CHECK_TICK)
+			{
+				timeout++;
+			}
+
+			if(timeout >= FLASH_PROGRAM_TIMEOUT)
+			{
+				programmed_OK = FALSE;
+				break;
+			}
 		}
 
-		if ((FLASH->SR & FLASH_SR_EOP) != 0) /* (4) */
+		/* Check the EOP flag in the FLASH_SR register */
+		if((FLASH->SR & FLASH_SR_EOP) != 0)
 		{
-			FLASH->SR = FLASH_SR_EOP; /* (5) */
+			/* Clear EOP flag */
+			FLASH->SR = FLASH_SR_EOP;
 		}
 		else
 		{
-			/* Manage the error cases */
+			/* Operation failed */
+			programmed_OK = FALSE;
 		}
 
 		src_addr++;
 		dst_addr++;
+
+		if(programmed_OK == FALSE)
+		{
+			break;
+		}
 	}
 
-	FLASH->CR &= ~FLASH_CR_PG; /* (6) */
+	/* Reset the PG Bit to disable programming */
+	FLASH->CR &= ~FLASH_CR_PG;
 }
 
-void Page_erase(void)
+uint8_t Page_erase(void)
 {
-	/* (1) Set the PER bit in the FLASH_CR register to enable page erasing */
-	/* (2) Program the FLASH_AR register to select a page to erase */
-	/* (3) Set the STRT bit in the FLASH_CR register to start the erasing */
-	/* (4) Wait until the BSY bit is reset in the FLASH_SR register */
-	/* (5) Check the EOP flag in the FLASH_SR register */
-	/* (6) Clear EOP flag by software by writing EOP at 1 */
-	/* (7) Reset the PER Bit to disable the page erase */
-	FLASH->CR |= FLASH_CR_PER; /* (1) */
-	FLASH->AR = (uint32_t)(&flash_settings); /* (2) */
-	FLASH->CR |= FLASH_CR_STRT; /* (3) */
+	uint8_t erased_OK = TRUE;
+	uint32_t timeout = 0;
 
-	while ((FLASH->SR & FLASH_SR_BSY) != 0) /* (4) */
+	/* Set the PER bit in the FLASH_CR register to enable page erasing */
+	FLASH->CR |= FLASH_CR_PER;
+
+	/* Program the FLASH_AR register to select a page to erase */
+	FLASH->AR = (uint32_t)(&flash_settings);
+
+	/* Set the STRT bit in the FLASH_CR register to start the erasing */
+	FLASH->CR |= FLASH_CR_STRT;
+
+	CLEAR_TICK;
+
+	/* Wait until the BSY bit is reset in the FLASH_SR register */
+	while((FLASH->SR & FLASH_SR_BSY) != 0)
 	{
-		/* For robust implementation, add here time-out management */
+		if(CHECK_TICK)
+		{
+			timeout++;
+		}
+
+		if(timeout >= FLASH_ERASE_TIMEOUT)
+		{
+			erased_OK = FALSE;
+			break;
+		}
 	}
 
-	if ((FLASH->SR & FLASH_SR_EOP) != 0) /* (5) */
+	/* Check the EOP flag in the FLASH_SR register */
+	if((FLASH->SR & FLASH_SR_EOP) != 0)
 	{
-		FLASH->SR = FLASH_SR_EOP; /* (6)*/
+		/* Clear EOP flag */
+		FLASH->SR = FLASH_SR_EOP;
 	}
 	else
 	{
-		/* Manage the error cases */
+		/* Operation failed */
+		erased_OK = FALSE;
 	}
 
-	FLASH->CR &= ~FLASH_CR_PER; /* (7) */
+	/* Reset the PER Bit to disable the page erase */
+	FLASH->CR &= ~FLASH_CR_PER;
+
+	return erased_OK;
 }
 
-void Init_flash(void)
+uint8_t Flash_unlock(void)
 {
-	struct settings_struct temp_settings;
+	uint8_t unlocked_OK = TRUE;
+	uint32_t timeout = 0;
 
-	/* Check settings */
-	static_assert((sizeof(flash_settings) % sizeof(uint16_t)) == 0,
-			"Flash settings structure has to be a multiple of uint16_t!");
+	CLEAR_TICK;
 
-	Read_settings(&temp_settings);
-
-	/* Check CRC */
-
-	/* Check data validity */
-	if((temp_settings.intensity > MAX_INTENSITY) || (temp_settings.intensity < MIN_INTENSITY))
+	/* Wait till no operation is on going */
+	while((FLASH->SR & FLASH_SR_BSY) != 0)
 	{
-		/* Assign default value */
-		temp_settings.intensity = (MAX_INTENSITY + MIN_INTENSITY) / 2;
+		if(CHECK_TICK)
+		{
+			timeout++;
+		}
 
-		/* Store settings */
-		Write_settings(&temp_settings);
+		if(timeout >= FLASH_UNLOCK_TIMEOUT)
+		{
+			unlocked_OK = FALSE;
+			break;
+		}
 	}
+
+	if(unlocked_OK == TRUE)
+	{
+		/* Is the flash memory is locked? */
+		if((FLASH->CR & FLASH_CR_LOCK) != 0)
+		{
+			/* Yes, perform unlock */
+			FLASH->KEYR = FLASH_UNLOCK_KEY1;
+			FLASH->KEYR = FLASH_UNLOCK_KEY2;
+		}
+	}
+
+	return unlocked_OK;
 }
 
-void Read_settings(volatile struct settings_struct *s)
+void Flash_lock(void)
 {
-	memcpy((void *)s, (void *)&flash_settings, sizeof(flash_settings));
-}
-
-void Write_settings(volatile struct settings_struct *s)
-{
-	/* Update CRC */
-
-	Flash_unlock();
-
-	Page_erase();
-
-	Flash_program(s);
-
-	Flash_lock();
+	/* Lock flash */
+	FLASH->CR |= FLASH_CR_LOCK;
 }

@@ -12,14 +12,14 @@
 
 struct settings_struct
 {
+	uint16_t ID;
+
 	uint8_t intensity;
 
 	uint8_t unused;
 
-	uint16_t crc;
+	uint32_t crc;
 };
-
-void Init_flash(void);
 
 void Read_settings(volatile struct settings_struct *s);
 
