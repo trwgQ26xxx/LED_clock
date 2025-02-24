@@ -187,19 +187,22 @@ inline static void Manage_periodic_updates(void)
 				/* Not halted */
 
 				/* Get data from RTC */
-				Get_RTC_data(&rtc_data);
+				if(Get_RTC_data(&rtc_data) == TRUE)
+				{
+					/* Update only if read was successful */
 
-				/* Copy data from RTC */
-				display_data.second				= rtc_data.second;
-				display_data.minute				= rtc_data.minute;
-				display_data.hour				= rtc_data.hour;
-				display_data.date				= rtc_data.date;
-				display_data.month				= rtc_data.month;
-				display_data.year				= rtc_data.year;
-				display_data.int_temperature	= rtc_data.temperature;
+					/* Copy data from RTC */
+					display_data.second				= rtc_data.second;
+					display_data.minute				= rtc_data.minute;
+					display_data.hour				= rtc_data.hour;
+					display_data.date				= rtc_data.date;
+					display_data.month				= rtc_data.month;
+					display_data.year				= rtc_data.year;
+					display_data.int_temperature	= rtc_data.temperature;
 
-				/* Manage colon */
-				display_data.hour_colon = rtc_data.second % 2 == 1 ? FALSE : TRUE;
+					/* Manage colon */
+					display_data.hour_colon = ((rtc_data.second % 2) == 1) ? FALSE : TRUE;
+				}
 			}
 		}
 
