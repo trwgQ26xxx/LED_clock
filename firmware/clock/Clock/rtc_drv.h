@@ -22,10 +22,10 @@ struct rtc_data_struct
 	int8_t temperature;
 };
 
-void Init_RTC(void);
+uint8_t Init_RTC(void);
 
-void Get_RTC_data(volatile struct rtc_data_struct *rtc_data);
+uint8_t Get_RTC_data(volatile struct rtc_data_struct *rtc_data);
 
-void Set_RTC_time(volatile struct rtc_data_struct *rtc_data);
+uint8_t Set_RTC_time(volatile struct rtc_data_struct *rtc_data);
 
 #endif /* RTC_DRV_H_ */
