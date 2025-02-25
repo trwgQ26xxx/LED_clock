@@ -2,6 +2,8 @@
 
 Clock with DS3231/DS3231M RTC.
 
+![CLOCK](PHOTOS/CLOCK.JPG)
+
 # Disclaimer
 
 I do not consent to the use of all or part of the project for commercial purposes!
