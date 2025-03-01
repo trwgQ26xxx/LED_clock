@@ -113,6 +113,10 @@ void Init(void)
 
 	display_data.intensity = clock_settings.intensity;
 
+	/* Disable keyboard to prevent selecting options, */
+	/* if any key would be stuck at startup */
+	Lock_keyboard();
+
 	/* Poke WDT */
 	LL_IWDG_ReloadCounter(IWDG);
 }
