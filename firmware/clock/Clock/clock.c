@@ -14,6 +14,8 @@
 #include "rtc_drv.h"
 #include "kbd_drv.h"
 #include "flash_drv.h"
+#include "onewire_bridge_drv.h"
+#include "ext_temp_sens_drv.h"
 
 #include "../Core/Inc/iwdg.h"
 
@@ -28,9 +30,9 @@ enum CLOCK_MODES
 
 volatile uint8_t current_clock_mode = NORMAL;
 
-volatile struct rtc_data_struct rtc_data;
-volatile struct display_data_struct display_data;
-volatile struct settings_struct clock_settings;
+volatile struct rtc_data_struct		rtc_data;
+volatile struct display_data_struct	display_data;
+volatile struct settings_struct		clock_settings;
 
 volatile uint8_t	keyboard_is_locked = FALSE;
 
@@ -43,6 +45,12 @@ volatile uint8_t	halt_rtc_read = FALSE;
 
 volatile uint8_t	update_flag = FALSE;
 volatile uint32_t	update_counter = 0;
+
+volatile uint8_t	ext_temp_is_present		= FALSE;
+volatile uint8_t	ext_temp_conv_triggered	= FALSE;
+
+volatile uint32_t	int_ext_temp_cycling_counter = 0;
+volatile uint8_t	int_ext_temp_cycling_flag = FALSE;
 
 inline static void Manage_periodic_updates(void);
 
@@ -62,6 +70,11 @@ inline static void Manage_store_settings(void);
 
 inline static void Clear_clock_set_inactivity_counter(void);
 inline static void Manage_clock_set_inactivity(void);
+
+inline static void Clear_int_ext_temp_cycling_counter(void);
+inline static void Manage_int_ext_temp_cycling(void);
+
+inline static void Go_to_normal_mode(void);
 
 void Set_update_display_flag(void)
 {
@@ -108,10 +121,22 @@ void Init(void)
 	display_data.year = 0;
 
 	display_data.int_temperature = 0;
+	display_data.ext_temperature = 0;
 
 	display_data.special_mode = DISPLAY_INT_TEMP;
 
 	display_data.intensity = clock_settings.intensity;
+
+	/* Initialize 1-Wire bridge and external temperature sensor */
+	if(Init_OneWire_bridge() == TRUE)
+	{
+		/* Update presence flag */
+		ext_temp_is_present = Init_ext_temp_sens();
+	}
+
+	Clear_int_ext_temp_cycling_counter();
+
+	Go_to_normal_mode();
 
 	/* Disable keyboard to prevent selecting options, */
 	/* if any key would be stuck at startup */
@@ -179,6 +204,8 @@ void Run(void)
 
 inline static void Manage_periodic_updates(void)
 {
+	int8_t ext_temp_data = 0;
+
 	/* Check update flag */
 	if(update_flag == TRUE)
 	{
@@ -224,11 +251,43 @@ inline static void Manage_periodic_updates(void)
 			Update_display_config(&display_data);
 		}
 
+		/* Check external temperature conversion trigger match */
+		if(update_counter == EXT_TEMP_CONV_TRIGGER_CNT)
+		{
+			/* Check if external temperature sensor is present */
+			if(ext_temp_is_present == TRUE)
+			{
+				/* Start external temperature conversion */
+				ext_temp_conv_triggered = Ext_temp_start_conversion();
+			}
+		}
+
+		/* Check external temperature read match */
+		if(update_counter == EXT_TEMP_DATA_READ_CNT)
+		{
+			/* Check if external temperature sensor is present and conversion was triggered */
+			if((ext_temp_is_present == TRUE) && (ext_temp_conv_triggered == TRUE))
+			{
+				/* Read external temperature */
+				if(Ext_temp_read_temperature(&ext_temp_data) == TRUE)
+				{
+					/* Update display data */
+					display_data.ext_temperature = ext_temp_data;
+				}
+
+				/* Clear conversion triggered flag */
+				ext_temp_conv_triggered = FALSE;
+			}
+		}
+
 		/* Store settings if necessary */
 		Manage_store_settings();
 
 		/* Exit clock set mode if no changes were made for 10s */
 		Manage_clock_set_inactivity();
+
+		/* Manage internal/external temperature cycling */
+		Manage_int_ext_temp_cycling();
 
 		/* Clear flag */
 		update_flag = FALSE;
@@ -252,9 +311,22 @@ inline static void Normal_mode(void)
 
 	if(current_clock_mode == NORMAL)
 	{
-		/* Manage temperature display */
-		/* TODO: Switch between ext and in every 2s */
-		display_data.special_mode = DISPLAY_INT_TEMP;
+		/* Check if time to switch temperatures elapsed */
+		if((ext_temp_is_present == TRUE) && (int_ext_temp_cycling_flag == TRUE))
+		{
+			/* Switch displayed temperature */
+			if(display_data.special_mode == DISPLAY_EXT_TEMP)
+			{
+				display_data.special_mode = DISPLAY_INT_TEMP;
+			}
+			else
+			{
+				display_data.special_mode = DISPLAY_EXT_TEMP;
+			}
+
+			/* Clear flag */
+			int_ext_temp_cycling_flag = FALSE;
+		}
 	}
 	else if(current_clock_mode == INTENSITY_SET)
 	{
@@ -316,7 +388,7 @@ inline static void Normal_mode(void)
 			}
 			else
 			{
-				current_clock_mode = NORMAL;
+				Go_to_normal_mode();
 			}
 
 			Lock_keyboard();
@@ -368,7 +440,7 @@ inline static void Hour_set_mode(void)
 		}
 		else if(ESC_KEY_IS_PRESSED)
 		{
-			current_clock_mode = NORMAL;
+			Go_to_normal_mode();
 
 			Lock_keyboard();
 		}
@@ -419,7 +491,7 @@ inline static void Minute_set_mode(void)
 		}
 		else if(ESC_KEY_IS_PRESSED)
 		{
-			current_clock_mode = NORMAL;
+			Go_to_normal_mode();
 
 			Lock_keyboard();
 		}
@@ -460,7 +532,7 @@ inline static void Second_set_mode(void)
 		}
 		else if(ESC_KEY_IS_PRESSED)
 		{
-			current_clock_mode = NORMAL;
+			Go_to_normal_mode();
 
 			Lock_keyboard();
 		}
@@ -511,7 +583,7 @@ inline static void Date_set_mode(void)
 		}
 		else if(ESC_KEY_IS_PRESSED)
 		{
-			current_clock_mode = NORMAL;
+			Go_to_normal_mode();
 
 			Lock_keyboard();
 		}
@@ -562,7 +634,7 @@ inline static void Month_set_mode(void)
 		}
 		else if(ESC_KEY_IS_PRESSED)
 		{
-			current_clock_mode = NORMAL;
+			Go_to_normal_mode();
 
 			Lock_keyboard();
 		}
@@ -594,7 +666,7 @@ inline static void Year_set_mode(void)
 			/* Store data in RTC */
 			Set_RTC_time(&rtc_data);
 
-			current_clock_mode = NORMAL;
+			Go_to_normal_mode();
 
 			Lock_keyboard();
 		}
@@ -620,7 +692,7 @@ inline static void Year_set_mode(void)
 		}
 		else if(ESC_KEY_IS_PRESSED)
 		{
-			current_clock_mode = NORMAL;
+			Go_to_normal_mode();
 
 			Lock_keyboard();
 		}
@@ -681,7 +753,7 @@ inline static void Manage_store_settings(void)
 			if(current_clock_mode == INTENSITY_SET)
 			{
 				/* Return to normal */
-				current_clock_mode = NORMAL;
+				Go_to_normal_mode();
 			}
 		}
 	}
@@ -702,7 +774,38 @@ inline static void Manage_clock_set_inactivity(void)
 		if(clock_set_inactivity_counter >= CLOCK_SET_INACTIVITY_CNTR_MAX)
 		{
 			/* Go back in NORMAL mode */
-			current_clock_mode = NORMAL;
+			Go_to_normal_mode();
 		}
 	}
+}
+
+inline static void Clear_int_ext_temp_cycling_counter(void)
+{
+	int_ext_temp_cycling_counter = 0;
+	int_ext_temp_cycling_flag = FALSE;
+}
+
+inline static void Manage_int_ext_temp_cycling(void)
+{
+	int_ext_temp_cycling_counter++;
+	if(int_ext_temp_cycling_counter >= INT_EXT_TEMP_CYCLING_CNTR_MAX)
+	{
+		/* Reset counter */
+		int_ext_temp_cycling_counter = 0;
+
+		/* Set flag to change displayed temperature */
+		int_ext_temp_cycling_flag = TRUE;
+	}
+}
+
+inline static void Go_to_normal_mode(void)
+{
+	/* Reset internal/external temperature cycling counter */
+	Clear_int_ext_temp_cycling_counter();
+
+	/* Set displayed temperature to internal */
+	display_data.special_mode = DISPLAY_INT_TEMP;
+
+	/* Go back in NORMAL mode */
+	current_clock_mode = NORMAL;
 }

@@ -53,6 +53,7 @@
 #define DATE_I_SIGN				0x18
 #define DATE_n_SIGN				0x54
 #define DATE_t_SIGN				0x9C
+#define DATE_E_SIGN				0x9D
 #define DATE_MINUS_SIGN			0x04
 
 /* Common for all */
@@ -64,6 +65,7 @@ const uint8_t seg_table_hour[10]				= {0x7E, 0x30, 0x6D, 0x79, 0x33, 0x5B, 0x5F,
 const uint8_t seg_table_date_temperature[10]	= {0xDB, 0x42, 0x97, 0xC7, 0x4E, 0xCD, 0xDD, 0x43, 0xDF, 0xCF};
 
 inline static void Convert_display_data_to_segments(volatile struct display_data_struct *data, uint8_t *hour_buffer, uint8_t *date_buffer, uint8_t *temp_buffer);
+inline static void Convert_temperature_data_to_segments(int8_t temperature, uint8_t *temp_buffer);
 inline static void Override_display_data_for_special_mode(volatile struct display_data_struct *data, uint8_t *hour_buffer, uint8_t *date_buffer, uint8_t *temp_buffer);
 inline static void Blank_segments_buffer(uint8_t *digits_data);
 inline static void Blank_DP_in_segments_buffer(uint8_t *digits_data, uint8_t dp);
@@ -128,8 +130,6 @@ void Update_display_data(volatile struct display_data_struct *data)
 
 inline static void Convert_display_data_to_segments(volatile struct display_data_struct *data, uint8_t *hour_buffer, uint8_t *date_buffer, uint8_t *temp_buffer)
 {
-	uint8_t temp;
-
 	/* Convert time */
 	Uint8_to_two_7segments_with_blanking(data->hour,		&hour_buffer[0], &hour_buffer[1], seg_table_hour);
 	Uint8_to_two_7segments_without_blanking(data->minute,	&hour_buffer[3], &hour_buffer[4], seg_table_hour);
@@ -156,17 +156,37 @@ inline static void Convert_display_data_to_segments(volatile struct display_data
 	Uint8_to_two_7segments_without_blanking(data->year,		&date_buffer[6], &date_buffer[7], seg_table_date_temperature);
 
 	/* Convert temperature */
-	temp_buffer[0] = BLANK_DISP; /* Blank first display, as only the internal temperature is implemented for now */
+	if(data->special_mode == DISPLAY_EXT_TEMP)
+	{
+		/* Show E to indicate external temperature */
+		temp_buffer[0] = DATE_E_SIGN;
+
+		/* Show external temperature */
+		Convert_temperature_data_to_segments(data->ext_temperature, temp_buffer);
+	}
+	else
+	{
+		/* Blank first display */
+		temp_buffer[0] = BLANK_DISP;
+
+		/* Show internal temperature */
+		Convert_temperature_data_to_segments(data->int_temperature, temp_buffer);
+	}
+}
+
+inline static void Convert_temperature_data_to_segments(int8_t temperature, uint8_t *temp_buffer)
+{
+	uint8_t temp;
 
 	/* Manage negative value */
-	if(data->int_temperature < 0)
+	if(temperature < 0)
 	{
-		temp = -data->int_temperature;
+		temp = -temperature;
 		temp_buffer[1] = DATE_MINUS_SIGN;
 	}
 	else
 	{
-		temp = data->int_temperature;
+		temp = temperature;
 		temp_buffer[1] = BLANK_DISP;
 	}
 

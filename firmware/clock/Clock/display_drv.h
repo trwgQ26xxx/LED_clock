@@ -26,6 +26,7 @@ struct display_data_struct
 	uint8_t hour_colon;
 
 	int8_t int_temperature;
+	int8_t ext_temperature;
 
 	uint8_t intensity;
 
